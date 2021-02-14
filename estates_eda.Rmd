@@ -1,0 +1,38 @@
+---
+title: "Estates EDA"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, dplyr.summarise.inform = FALSE)
+```
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(here)
+```
+
+# Eda of HESA Estates data
+
+Environmental information for UK higher education providers collected as part of the Estates management record. The data covers the academic years 2015/16 to 2018/19.
+
+The file `estates.csv` was created by `estates_preproc.Rmd`.
+
+```{r read_data}
+estates <- 
+  read_csv(here('ProcData', 'estates.csv'))
+```
+
+
+
+```{r}
+estates %>% 
+  filter(str_detect(he_provider, "Leicester")) %>% 
+  filter(category_marker == "Total carbon reduction target", academic_year == "2018/19") %>% 
+  select(he_provider, category_marker, value) %>% 
+  arrange(desc(value))
+```
+
+
+
+

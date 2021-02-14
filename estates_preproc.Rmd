@@ -1,0 +1,70 @@
+---
+title: "Estates Pre-process"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, dplyr.summarise.inform = FALSE)
+```
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(here)
+library(janitor)
+```
+
+# Eda of HESA Estates data
+
+Environmental information for UK higher education providers collected as part of the Estates management record. The data covers the academic years 2015/16 to 2018/19.
+
+A single CSV file was downloaded on 2021-02-04 from: https://www.hesa.ac.uk/data-and-analysis/estates/environmental
+
+```{r read_data}
+# Read everything as char, except skip column 6 (Table)
+estates <- 
+  read_csv(here('Data', 'data.csv'), skip = 11, col_types = 'ccccc-ccc') %>% 
+  clean_names()
+```
+
+Sort out non-numeric values
+
+There appear to be two types of enty in the `value` column that can't be coerced to `numeric` by `as.numeric`.
+
+1. Character strings from the set {'Basic', 'Medium', 'Detailed'}. These are always associated with the `category_marker` "Method of Scope 3 carbon emissions from waste". For the moment we will remove these rows and save separately.
+
+```{r remove_Scope3Method}
+scope3method <- 
+  estates %>% 
+  filter(category_marker == "Method of Scope 3 carbon emissions from waste")
+
+#unique(scope3method$value)
+
+estates <- 
+  estates %>% 
+  filter(category_marker != "Method of Scope 3 carbon emissions from waste")
+```
+
+2. Numbers followed by a % symbol. These are dealt with by removing the symbol, since it is included in the `category` column.
+
+```{r remove%symbol}
+estates <-
+  estates %>% 
+  mutate(value = str_replace(value, '%', ''))
+```
+
+We can now convert the `value` column to numeric.
+
+```{r make_numeric_values, warning=FALSE}
+estates <- 
+  estates %>% 
+  mutate(value = as.numeric(value))
+```
+
+```{r}
+write_csv(estates, here('ProcData', 'estates.csv'))
+write_csv(scope3method, here('ProcData', 'scope3method.csv'))
+```
+
+
+
+
