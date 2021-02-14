@@ -1,6 +1,8 @@
 ---
 title: "Estates EDA"
-output: github_document
+output:
+  html_document: 
+    keep_md: yes
 ---
 
 ```{r setup, include=FALSE}
