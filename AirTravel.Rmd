@@ -1,0 +1,104 @@
+---
+title: "Air travel carbon"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, dplyr.summarise.inform = FALSE)
+```
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(here)
+library(geosphere)
+library(readxl)
+library(janitor)
+```
+
+```{r read_data, message = FALSE}
+airports <- 
+  read_csv(here('ProcData', 'medlarge_airports.csv'))
+OriginalLookup <- 
+  read_excel(here('Data', 'OriginalLookup.xlsx'), range = "a1:j154") %>% 
+  clean_names()
+```
+
+```{r get_origins}
+origin <- 
+  # Filter out airports not in the original lookup.
+  airports %>% 
+  filter(iata_code %in% OriginalLookup$city_airport_code) %>% 
+  select(c('name', 'latitude_deg', 'longitude_deg', 'continent', 'iso_country', 'iso_region', 'iata_code'))
+```
+
+```{r add_destinations}
+dest <- 
+  # Destination airports to be included in the output
+  airports %>% 
+  filter(iata_code %in% c('LHR', 'BHX')) %>% 
+  select(dest_iata = iata_code,
+         dest_longitude = longitude_deg,
+         dest_latitude = latitude_deg)
+
+air_distances <- 
+  # Repeat origin rows for each destination; add destination details.
+  bind_rows(origin, origin) %>% 
+  mutate(dest_iata = rep(dest$dest_iata, each = nrow(origin))) %>% 
+  left_join(dest) %>% 
+  # Calculate shortest distance between origin and destination
+  mutate(distance = distGeo(bind_cols(longitude_deg, latitude_deg), bind_cols(dest_longitude, dest_latitude)))
+```
+
+Compare our distances with those from the original lookup.
+
+```{r compare_distances}
+combined <- 
+  air_distances %>% 
+  left_join(OriginalLookup, by = c('iata_code' = 'city_airport_code'))
+
+error_lhr <- 
+  combined %>% 
+  filter(dest_iata == 'LHR') %>% 
+  mutate(lhr_error = distance / 1000 - distance_from_lhr_km) %>% 
+  select(c('country_territory', 'iata_code', 'distance_from_lhr_km', 'lhr_error'))
+  
+error_lhr %>% 
+  arrange(desc(abs(lhr_error))) %>% 
+  head()
+
+error_bhx <- 
+  combined %>% 
+  filter(dest_iata == 'BHX') %>% 
+  mutate(bhx_error = distance / 1000 - distance_from_bhx_km) %>% 
+  select(c('country_territory', 'iata_code', 'distance_from_bhx_km', 'bhx_error'))
+
+error_bhx %>% 
+  arrange(desc(abs(bhx_error))) %>% 
+  head()
+```
+
+Nothing to worry about, though it might be worth checking the entries for the top three errors.
+
+#### Which airports on the original lookup have we missed?
+
+```{r}
+OriginalLookup %>% 
+  anti_join(origin, by = c('city_airport_code' = 'iata_code'))
+
+```
+
+I think Berlin Tegel Airport (TXL) is now closed and the main Berlin airport should be Berlin Brandenburg (BER).
+
+Also for noting: SKP is duplicated in the original lookup as serving both Macedonia and North Macedonia. Similarly TLV is duplicated as serving Israel and the State of Palestine.
+
+This accounts for the difference in lengths of `origin` and `OriginalLookup`
+
+
+## References
+
+Original data from: https://ourairports.com/data/ Accesssed 2021-02-20 .
+
+
+
